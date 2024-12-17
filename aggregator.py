@@ -1,18 +1,17 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import window, avg
-from delta import configure_spark_with_delta_pip
+
 
 # Initialize Spark session
-builder = (
+spark = (
     SparkSession.builder.appName("Tick Aggregator")
-    .config("spark.driver.memory", "8g")
     .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
     .config(
         "spark.sql.catalog.spark_catalog",
         "org.apache.spark.sql.delta.catalog.DeltaCatalog",
     )
+    .getOrCreate()
 )
-spark = configure_spark_with_delta_pip(builder).getOrCreate()
 
 # Define the schema of the tick data
 from pyspark.sql.types import (
@@ -32,7 +31,7 @@ tick_schema = StructType(
 )
 
 # File source directory (change this to your source directory)
-input_path = "./tick_data"
+input_path = "/aggregator/tick_data"
 
 # Read streaming data from the file source
 tick_stream = (
