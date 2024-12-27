@@ -8,7 +8,7 @@ def do_compute(arrow_table):
     df = pl.from_arrow(arrow_table)
     processing_time: datetime = df.select(pl.col("timeslice")).unnest(
         "timeslice").select(pl.max("end")).rows()[0][0]
-
+    print(f"Latency = {(datetime.now(tz=timezone.utc) - processing_time).total_seconds() *1000} millis")
 
 class FlightServer(flight.FlightServerBase):
     def __init__(self, host="0.0.0.0", port=8815):
