@@ -12,6 +12,7 @@ from json import dumps
 
 symbols = ["a", "b", "c", "d", "e"]
 num_files = 10000
+BOOTSTRAP_SERVERS = "172.17.0.1:9092"
 
 @dataclass
 class Aggregation:
@@ -32,7 +33,7 @@ def parse_arrow(binary_message: bytes) -> Sequence[Aggregation]:
     return aggs
 
 async def generate_ticks():
-    producer = AIOKafkaProducer(bootstrap_servers="172.17.0.1:9092")
+    producer = AIOKafkaProducer(bootstrap_servers=BOOTSTRAP_SERVERS)
     await producer.start()
     for i in range(num_files):
         await asyncio.sleep(0.01)
@@ -52,14 +53,14 @@ async def generate_ticks():
             with pa.ipc.new_stream(sink, table.schema) as writer:
                 writer.write_table(table)
             buffer = sink.getvalue()
-            await producer.send_and_wait("ticks", buffer.to_pybytes())
+            await producer.send_and_wait("tick", buffer.to_pybytes())
     await producer.stop()
     print("Finished generating ticks")
     
 latency_data_file = open("./latency.ndjson", "w")
 
 async def consume_aggregations():
-    consumer = AIOKafkaConsumer("aggregations", bootstrap_servers="172.17.0.1:9092")
+    consumer = AIOKafkaConsumer("aggregation", bootstrap_servers=BOOTSTRAP_SERVERS)
     await consumer.start()
     async for msg in consumer:
         for agg in parse_arrow(msg.value):

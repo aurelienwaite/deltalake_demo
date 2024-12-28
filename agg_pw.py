@@ -1,7 +1,6 @@
 import pathway as pw
 import pyarrow as pa
-import time
-from typing import Tuple, List
+from beartype.typing import Tuple, List
 from datetime import timedelta, datetime, timezone
 
 arrow_schema = pa.schema([
@@ -30,7 +29,7 @@ def parse_arrow(binary_message: bytes) -> List[Tuple[str, pw.DateTimeUtc, float]
 
 raw_ticks = pw.io.kafka.read(
     rdkafka_settings,
-    topic="ticks",
+    topic="tick",
     format="raw",
     autocommit_duration_ms=10,
     parallel_readers=4
@@ -77,7 +76,7 @@ agg_arrow = agg.select(
 )
 
 pw.io.kafka.write(
-    agg_arrow, rdkafka_settings, topic_name="aggregations", format="raw"
+    agg_arrow, rdkafka_settings, topic_name="aggregation", format="raw"
 )
 
 pw.run()
