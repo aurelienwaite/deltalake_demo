@@ -1,1 +1,1 @@
-docker/aggregator/agg_pw.py
+docker/**/*.py
