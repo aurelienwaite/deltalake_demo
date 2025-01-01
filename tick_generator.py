@@ -1,6 +1,5 @@
 # Test script that creates synthetic ticks to be aggregated
 
-from aiokafka import AIOKafkaProducer, AIOKafkaConsumer
 import asyncio
 import random
 from datetime import datetime, timezone
@@ -9,10 +8,16 @@ import pyarrow as pa
 from dataclasses import dataclass, fields
 from typing import Sequence
 from json import dumps
+import argparse
+from generator_protos import Producer, Consumer
+from kafka_generator import KafkaProducer, KafkaConsumer
+from redis_generator import RedisConsumer, RedisProducer
+
+from typing import Dict, Tuple
 
 symbols = ["a", "b", "c", "d", "e"]
 num_files = 10000
-BOOTSTRAP_SERVERS = "172.17.0.1:9092"
+aggregation_topic = "aggregate"
 
 @dataclass
 class Aggregation:
@@ -21,6 +26,21 @@ class Aggregation:
     end: datetime
     sum: float
     count: float
+    
+
+
+parser = argparse.ArgumentParser(description='Tick generator')
+
+test_brokers: Dict[str, Tuple[Consumer, Producer]] = {
+    "kafka": (KafkaConsumer(aggregation_topic), KafkaProducer()),
+    "redis": (RedisConsumer(aggregation_topic), RedisProducer())
+}
+
+# Add arguments
+parser.add_argument('test_broker', help='Broker to test', choices=test_brokers)
+# Parse arguments
+args = parser.parse_args()
+consumer, producer = test_brokers[args.test_broker]
 
 def parse_arrow(binary_message: bytes) -> Sequence[Aggregation]:
     reader = pa.ipc.open_stream(binary_message)
@@ -33,7 +53,7 @@ def parse_arrow(binary_message: bytes) -> Sequence[Aggregation]:
     return aggs
 
 async def generate_ticks():
-    producer = AIOKafkaProducer(bootstrap_servers=BOOTSTRAP_SERVERS)
+    
     await producer.start()
     for i in range(num_files):
         await asyncio.sleep(0.01)
@@ -53,17 +73,16 @@ async def generate_ticks():
             with pa.ipc.new_stream(sink, table.schema) as writer:
                 writer.write_table(table)
             buffer = sink.getvalue()
-            await producer.send_and_wait("tick", buffer.to_pybytes())
+            await producer.send("tick", buffer.to_pybytes())
     await producer.stop()
     print("Finished generating ticks")
     
-latency_data_file = open("./latency.ndjson", "w")
+latency_data_file = open(f"./{args.test_broker}_latency.ndjson", "w")
 
 async def consume_aggregations():
-    consumer = AIOKafkaConsumer("aggregation", bootstrap_servers=BOOTSTRAP_SERVERS)
     await consumer.start()
     async for msg in consumer:
-        for agg in parse_arrow(msg.value):
+        for agg in parse_arrow(msg):
             now = datetime.now(tz=timezone.utc)
             end = agg.end
             diff = (now - end).total_seconds() * 1000

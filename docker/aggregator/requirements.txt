@@ -1,2 +1,0 @@
-pathway==0.16.2
-pyarrow==18.1.0
